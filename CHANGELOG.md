@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- `disabledEmailInputs` prop to both login blocks
+
 ## [2.38.0] - 2020-09-16
 
 ### Changed
