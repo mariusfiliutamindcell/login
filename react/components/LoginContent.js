@@ -1,4 +1,4 @@
-import React, { Component, Suspense, useMemo } from 'react'
+import React, { Component, Suspense, useMemo, useState, useEffect } from 'react'
 
 import PropTypes from 'prop-types'
 import classNames from 'classnames'
@@ -28,6 +28,7 @@ import getErrorQuery from '../utils/getErrorQuery'
 import getSessionProfile from '../utils/getSessionProfile'
 import { getReturnUrl, getDefaultRedirectUrl, jsRedirect } from '../utils/redirect'
 import styleModifierByStep from '../utils/styleModifierByStep'
+import useAsyncCallback from '../utils/useAsyncCallback'
 
 import styles from '../styles.css'
 
@@ -160,7 +161,6 @@ class LoginContent extends Component {
   }
 
   state = {
-    sessionProfile: this.props.profile,
     isOnInitialScreen: !(this.props.profile && this.props.profile.isAuthenticated),
     isCreatePassword: this.props.defaultIsCreatePassword,
     step: this.props.defaultOption,
@@ -173,12 +173,6 @@ class LoginContent extends Component {
     if (location.href.indexOf('accountAuthCookieName') > 0) {
       setCookie(location.href)
     }
-
-    getSessionProfile().then(sessionProfile => {
-      if (sessionProfile) {
-        this.setState({ sessionProfile })
-      }
-    })
   }
 
   get shouldRenderLoginOptions() {
@@ -191,13 +185,13 @@ class LoginContent extends Component {
     const {
       isHeaderLogin,
       isInitialScreenOptionOnly,
+      profile,
     } = this.props
     const {
-      sessionProfile,
       isOnInitialScreen,
     } = this.state
 
-    const { isAuthenticated } = sessionProfile || {}
+    const { isAuthenticated } = profile || {}
 
     if (isHeaderLogin && isAuthenticated) {
       return true
@@ -277,13 +271,13 @@ class LoginContent extends Component {
       optionsTitle,
       defaultOption,
       providerPasswordButtonLabel,
+      profile,
     } = this.props
     const {
       isOnInitialScreen,
-      sessionProfile,
     } = this.state
 
-    const { isAuthenticated } = sessionProfile || {}
+    const { isAuthenticated } = profile || {}
 
     let step = this.state.step
     if (isHeaderLogin && isAuthenticated) {
@@ -338,14 +332,14 @@ class LoginContent extends Component {
       isInitialScreenOptionOnly,
       defaultOption,
       runtime,
+      profile,
     } = this.props
 
     const {
       isOnInitialScreen,
-      sessionProfile,
     } = this.state
 
-    const { isAuthenticated } = sessionProfile || {}
+    const { isAuthenticated } = profile || {}
 
     if (!isHeaderLogin && isAuthenticated) {
       if (location.pathname.includes('/login')) {
@@ -475,11 +469,32 @@ const LoginContentProvider = props => {
     [props.isHeaderLogin]
   )
 
-  const userEmail = getUserEmailQuery()
+  const [, {
+    value: profileFromSession,
+    loading: loadingProfileFromSession
+  }] = useAsyncCallback(() => getSessionProfile(), [], {
+    autorun: !props.isHeaderLogin,
+  })
+  const profile = useMemo(() => {
+    if (props.isHeaderLogin) {
+      return props.profile
+    }
+    return profileFromSession
+  }, [props.isHeaderLogin, props.profile, profileFromSession])
+
+  const userEmail = (profile && profile.email) || getUserEmailQuery()
+  
+  if (loadingProfileFromSession) {
+    return (
+      <div data-testid="loading-session">
+        <Loading />
+      </div>
+    )
+  }
 
   return (
     <AuthStateLazy
-      skip={!!(props.profile && props.profile.isAuthenticated)}
+      skip={!!(profile && profile.isAuthenticated)}
       scope="STORE"
       parentAppId={SELF_APP_NAME_AND_VERSION}
       returnUrl={redirectUrl}
@@ -487,14 +502,22 @@ const LoginContentProvider = props => {
     >
       {({ loading }) => {
         if (loading) {
-          return <div data-testid="loading-session">
-            <Loading />
-          </div>
+          return (
+            <div data-testid="loading-session">
+              <Loading />
+            </div>
+          )
         }
         return (
           <AuthServiceLazy.RedirectAfterLogin>
             {({ action: apiRedirect }) => (
-              <LoginContentWrapper {...props} intl={intl} runtime={runtime} apiRedirect={apiRedirect} />
+              <LoginContentWrapper
+                {...props}
+                profile={profile}
+                intl={intl}
+                runtime={runtime}
+                apiRedirect={apiRedirect}
+              />
             )}
           </AuthServiceLazy.RedirectAfterLogin>
       )}}
