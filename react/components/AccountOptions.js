@@ -38,7 +38,7 @@ const AccountOptions = ({ intl, optionLinks }) => {
               <a
                 className={`${handles[cssClass] ||
                   ''} db no-underline t-small c-muted-1 hover-c-action-primary pv3`}
-                href={new URL(path || '/', window.location.href).href}
+                href={new URL(path || '/', window.location.origin).href}
                 key={inx}
               >
                 {label}
